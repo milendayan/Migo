@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,58 +7,71 @@ import {
   Pressable,
   Modal,
   TextInput,
+  Switch,
 } from 'react-native';
-
-const MASCOTAS = [
-  { id: 1, nombre: 'Max', emoji: '🐶' },
-  { id: 2, nombre: 'Luna', emoji: '🐱' },
-];
-
-const ACTIVIDADES_INICIALES = [
-  // Max
-  { id: 1, mascotaId: 1, nombre: 'Thyro Tabs', tipo: 'Medicamento', hora: '7:00 a. m.', completada: true, dia: 'hoy' },
-  { id: 2, mascotaId: 1, nombre: 'Desayuno', tipo: 'Alimentación', hora: '8:00 a. m.', completada: true, dia: 'hoy' },
-  { id: 3, mascotaId: 1, nombre: 'Cuidado', tipo: 'Medicamento', hora: '12:00 p. m.', completada: true, dia: 'hoy' },
-  { id: 4, mascotaId: 1, nombre: 'Almuerzo', tipo: 'Alimentación', hora: '1:00 p. m.', completada: true, dia: 'hoy' },
-  { id: 5, mascotaId: 1, nombre: 'Paseo', tipo: 'Actividad física', hora: '4:00 p. m.', completada: false, dia: 'hoy' },
-  { id: 6, mascotaId: 1, nombre: 'Thyro Tabs', tipo: 'Medicamento', hora: '7:00 p. m.', completada: false, dia: 'hoy' },
-  { id: 7, mascotaId: 1, nombre: 'Medicamento X', tipo: 'Medicamento', hora: '8:30 p. m.', completada: false, dia: 'hoy' },
-
-  // Luna
-  { id: 8, mascotaId: 2, nombre: 'Desayuno', tipo: 'Alimentación', hora: '8:00 a. m.', completada: true, dia: 'hoy' },
-  { id: 9, mascotaId: 2, nombre: 'Juego', tipo: 'Entrenamiento', hora: '11:00 a. m.', completada: true, dia: 'hoy' },
-  { id: 10, mascotaId: 2, nombre: 'Cepillado', tipo: 'Higiene', hora: '5:00 p. m.', completada: false, dia: 'hoy' },
-  { id: 11, mascotaId: 2, nombre: 'Cena', tipo: 'Alimentación', hora: '7:00 p. m.', completada: false, dia: 'hoy' },
-  { id: 12, mascotaId: 2, nombre: 'Juego nocturno', tipo: 'Entrenamiento', hora: '9:00 p. m.', completada: false, dia: 'hoy' },
-
-  // Ejemplo semana
-  { id: 13, mascotaId: 1, nombre: 'Vacuna anual', tipo: 'Salud', hora: '10:00 a. m.', completada: false, dia: 'semana', diaSemana: 'Miércoles' },
-  { id: 14, mascotaId: 1, nombre: 'Baño', tipo: 'Higiene', hora: '4:00 p. m.', completada: false, dia: 'semana', diaSemana: 'Sábado' },
-  { id: 15, mascotaId: 2, nombre: 'Control veterinario', tipo: 'Salud', hora: '11:00 a. m.', completada: false, dia: 'semana', diaSemana: 'Jueves' },
-];
+import {
+  obtenerActividadesHorario,
+  TIPOS_ACTIVIDAD,
+} from '../services/actividadesService';
+import { obtenerMascotas } from '../services/mascotasService';
 
 export default function HorarioScreen() {
-  const [mascotaSeleccionada, setMascotaSeleccionada] = useState(MASCOTAS[0]);
+  const [mascotasLista, setMascotasLista] = useState([]);
+  const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
   const [vista, setVista] = useState('hoy');
-  const [actividades, setActividades] = useState(ACTIVIDADES_INICIALES);
+  const [actividades, setActividades] = useState([]);
   const [mostrarSelector, setMostrarSelector] = useState(false);
+  const [cargando, setCargando] = useState(true);
 
-  // Modal agregar / editar
   const [modalVisible, setModalVisible] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [actividadEditando, setActividadEditando] = useState(null);
   const [form, setForm] = useState({
+    mascotaId: 1,
     nombre: '',
     tipo: '',
     hora: '',
+    fecha: '',
+    repeticion: 'Una vez',
+    recordatorioOn: true,
+    recordatorio: '15 minutos antes',
+    notas: '',
     diaSemana: '',
   });
   const [errores, setErrores] = useState({});
   const [confirmarEliminar, setConfirmarEliminar] = useState(null);
 
-  const actividadesFiltradas = actividades.filter(
-    (a) => a.mascotaId === mascotaSeleccionada.id && a.dia === vista
-  );
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const [acts, mascs] = await Promise.all([
+          obtenerActividadesHorario(),
+          obtenerMascotas(),
+        ]);
+        setActividades(acts);
+        const lista = mascs.map((m) => ({
+          id: m.id,
+          nombre: m.nombre,
+          emoji: m.emoji || '🐾',
+        }));
+        setMascotasLista(lista);
+        if (lista.length > 0) {
+          setMascotaSeleccionada(lista[0]);
+        }
+      } catch (e) {
+        console.log('Error al cargar horario:', e);
+      } finally {
+        setCargando(false);
+      }
+    };
+    cargar();
+  }, []);
+
+  const actividadesFiltradas = mascotaSeleccionada
+    ? actividades.filter(
+        (a) => a.mascotaId === mascotaSeleccionada.id && a.dia === vista
+      )
+    : [];
 
   const completadas = actividadesFiltradas.filter((a) => a.completada).length;
   const total = actividadesFiltradas.length;
@@ -70,10 +83,23 @@ export default function HorarioScreen() {
     );
   };
 
+  const formVacio = () => ({
+    mascotaId: mascotaSeleccionada?.id || 1,
+    nombre: '',
+    tipo: '',
+    hora: '',
+    fecha: '',
+    repeticion: 'Una vez',
+    recordatorioOn: true,
+    recordatorio: '15 minutos antes',
+    notas: '',
+    diaSemana: '',
+  });
+
   const abrirAgregar = () => {
     setModoEdicion(false);
     setActividadEditando(null);
-    setForm({ nombre: '', tipo: '', hora: '', diaSemana: '' });
+    setForm(formVacio());
     setErrores({});
     setModalVisible(true);
   };
@@ -82,9 +108,15 @@ export default function HorarioScreen() {
     setModoEdicion(true);
     setActividadEditando(actividad);
     setForm({
+      mascotaId: actividad.mascotaId,
       nombre: actividad.nombre,
       tipo: actividad.tipo,
       hora: actividad.hora,
+      fecha: actividad.fecha || '',
+      repeticion: actividad.repeticion || 'Una vez',
+      recordatorioOn: actividad.recordatorioOn !== false,
+      recordatorio: actividad.recordatorio || '15 minutos antes',
+      notas: actividad.notas || '',
       diaSemana: actividad.diaSemana || '',
     });
     setErrores({});
@@ -99,16 +131,16 @@ export default function HorarioScreen() {
 
   const guardarActividad = () => {
     const nuevosErrores = {};
-
-    if (!form.nombre.trim()) nuevosErrores.nombre = 'El nombre es obligatorio';
+    if (!form.mascotaId) nuevosErrores.mascotaId = 'Selecciona una mascota';
     if (!form.tipo.trim()) nuevosErrores.tipo = 'El tipo es obligatorio';
+    if (!form.nombre.trim()) nuevosErrores.nombre = 'Escribe el nombre de la actividad';
     if (!form.hora.trim()) nuevosErrores.hora = 'La hora es obligatoria';
+    if (!form.fecha.trim()) nuevosErrores.fecha = 'La fecha es obligatoria';
     if (vista === 'semana' && !form.diaSemana.trim()) {
       nuevosErrores.diaSemana = 'El día de la semana es obligatorio';
     }
 
     setErrores(nuevosErrores);
-
     if (Object.keys(nuevosErrores).length > 0) return;
 
     if (modoEdicion && actividadEditando) {
@@ -117,9 +149,15 @@ export default function HorarioScreen() {
           a.id === actividadEditando.id
             ? {
                 ...a,
+                mascotaId: form.mascotaId,
                 nombre: form.nombre,
                 tipo: form.tipo,
                 hora: form.hora,
+                fecha: form.fecha,
+                repeticion: form.repeticion,
+                recordatorioOn: form.recordatorioOn,
+                recordatorio: form.recordatorio,
+                notas: form.notas,
                 diaSemana: vista === 'semana' ? form.diaSemana : a.diaSemana,
               }
             : a
@@ -128,10 +166,15 @@ export default function HorarioScreen() {
     } else {
       const nueva = {
         id: Date.now(),
-        mascotaId: mascotaSeleccionada.id,
+        mascotaId: form.mascotaId,
         nombre: form.nombre,
         tipo: form.tipo,
         hora: form.hora,
+        fecha: form.fecha,
+        repeticion: form.repeticion,
+        recordatorioOn: form.recordatorioOn,
+        recordatorio: form.recordatorio,
+        notas: form.notas,
         completada: false,
         dia: vista,
         diaSemana: vista === 'semana' ? form.diaSemana : undefined,
@@ -154,6 +197,21 @@ export default function HorarioScreen() {
     }
   };
 
+  if (cargando || !mascotaSeleccionada) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#F4FCFA',
+        }}
+      >
+        <Text style={{ color: '#71817E' }}>Cargando horario...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -162,7 +220,6 @@ export default function HorarioScreen() {
       >
         <Text style={styles.titulo}>Horario de cuidado</Text>
 
-        {/* Selector de mascota */}
         <View style={styles.selectorRow}>
           <Text style={styles.labelSelector}>Horario de:</Text>
           <Pressable
@@ -177,7 +234,7 @@ export default function HorarioScreen() {
 
         {mostrarSelector && (
           <View style={styles.dropdown}>
-            {MASCOTAS.map((m) => (
+            {mascotasLista.map((m) => (
               <Pressable
                 key={m.id}
                 style={[
@@ -196,7 +253,6 @@ export default function HorarioScreen() {
           </View>
         )}
 
-        {/* Progreso */}
         <View style={styles.progresoContainer}>
           <Text style={styles.progresoTexto}>
             {completadas} de {total} actividades completadas
@@ -207,7 +263,6 @@ export default function HorarioScreen() {
           <View style={[styles.barraProgreso, { width: `${porcentaje}%` }]} />
         </View>
 
-        {/* Tabs */}
         <View style={styles.tabs}>
           <Pressable
             style={[styles.tab, vista === 'hoy' && styles.tabActiva]}
@@ -227,7 +282,6 @@ export default function HorarioScreen() {
           </Pressable>
         </View>
 
-        {/* Lista de actividades */}
         {actividadesFiltradas.length === 0 ? (
           <View style={styles.vacio}>
             <Text style={styles.vacioTexto}>No hay actividades registradas</Text>
@@ -286,103 +340,244 @@ export default function HorarioScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* ========== MODAL AGREGAR / EDITAR ========== */}
       <Modal
         visible={modalVisible}
         transparent
         animationType="slide"
         onRequestClose={cerrarModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitulo}>
-                {modoEdicion ? 'Editar actividad' : 'Nueva actividad'}
-              </Text>
-              <Pressable onPress={cerrarModal}>
-                <Text style={styles.closeText}>✕</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.label}>Nombre *</Text>
-            <TextInput
-              style={[styles.input, errores.nombre && styles.inputError]}
-              placeholder="Ej: Paseo, Medicamento..."
-              value={form.nombre}
-              onChangeText={(t) => {
-                setForm({ ...form, nombre: t });
-                if (errores.nombre) setErrores({ ...errores, nombre: null });
-              }}
-            />
-            {errores.nombre ? (
-              <Text style={styles.errorTexto}>{errores.nombre}</Text>
-            ) : null}
-
-            <Text style={styles.label}>Tipo *</Text>
-            <TextInput
-              style={[styles.input, errores.tipo && styles.inputError]}
-              placeholder="Ej: Medicamento, Alimentación, Higiene..."
-              value={form.tipo}
-              onChangeText={(t) => {
-                setForm({ ...form, tipo: t });
-                if (errores.tipo) setErrores({ ...errores, tipo: null });
-              }}
-            />
-            {errores.tipo ? (
-              <Text style={styles.errorTexto}>{errores.tipo}</Text>
-            ) : null}
-
-            <Text style={styles.label}>Hora *</Text>
-            <TextInput
-              style={[styles.input, errores.hora && styles.inputError]}
-              placeholder="Ej: 4:00 p. m."
-              value={form.hora}
-              onChangeText={(t) => {
-                setForm({ ...form, hora: t });
-                if (errores.hora) setErrores({ ...errores, hora: null });
-              }}
-            />
-            {errores.hora ? (
-              <Text style={styles.errorTexto}>{errores.hora}</Text>
-            ) : null}
-
-            {vista === 'semana' && (
-              <>
-                <Text style={styles.label}>Día de la semana *</Text>
-                <TextInput
-                  style={[styles.input, errores.diaSemana && styles.inputError]}
-                  placeholder="Ej: Lunes, Miércoles..."
-                  value={form.diaSemana}
-                  onChangeText={(t) => {
-                    setForm({ ...form, diaSemana: t });
-                    if (errores.diaSemana) setErrores({ ...errores, diaSemana: null });
-                  }}
-                />
-                {errores.diaSemana ? (
-                  <Text style={styles.errorTexto}>{errores.diaSemana}</Text>
-                ) : null}
-              </>
-            )}
-
-            <Text style={styles.avisoMascota}>
-              Se agregará para: {mascotaSeleccionada.emoji} {mascotaSeleccionada.nombre}
-            </Text>
-
-            <View style={styles.botonesForm}>
-              <Pressable style={styles.botonCancelar} onPress={cerrarModal}>
-                <Text style={styles.botonCancelarTexto}>Cancelar</Text>
-              </Pressable>
-              <Pressable style={styles.botonGuardar} onPress={guardarActividad}>
-                <Text style={styles.botonGuardarTexto}>
-                  {modoEdicion ? 'Guardar' : 'Agregar'}
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheet}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 28 }}
+            >
+              <View style={styles.sheetHeader}>
+                <Pressable onPress={cerrarModal} style={styles.backBtn}>
+                  <Text style={styles.backArrow}>←</Text>
+                </Pressable>
+                <Text style={styles.sheetTitle}>
+                  {modoEdicion ? 'Editar actividad' : 'Nueva actividad'}
                 </Text>
-              </Pressable>
-            </View>
+                <View style={{ width: 32 }} />
+              </View>
+
+              <View style={{ paddingHorizontal: 20 }}>
+                <Text style={styles.label}>Mascota *</Text>
+                <View style={styles.tiposRow}>
+                  {mascotasLista.map((m) => (
+                    <Pressable
+                      key={m.id}
+                      style={[
+                        styles.chipTipo,
+                        form.mascotaId === m.id && styles.chipTipoActivo,
+                      ]}
+                      onPress={() => {
+                        setForm({ ...form, mascotaId: m.id });
+                        if (errores.mascotaId) setErrores({ ...errores, mascotaId: null });
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipTexto,
+                          form.mascotaId === m.id && styles.chipTextoActivo,
+                        ]}
+                      >
+                        {m.nombre}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {errores.mascotaId ? (
+                  <Text style={styles.errorTextoWarn}>⚠ {errores.mascotaId}</Text>
+                ) : null}
+
+                <Text style={styles.label}>Tipo de actividad *</Text>
+                <View style={styles.tiposRow}>
+                  {TIPOS_ACTIVIDAD.map((t) => (
+                    <Pressable
+                      key={t}
+                      style={[styles.chipTipo, form.tipo === t && styles.chipTipoActivo]}
+                      onPress={() => {
+                        setForm({ ...form, tipo: t });
+                        if (errores.tipo) setErrores({ ...errores, tipo: null });
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipTexto,
+                          form.tipo === t && styles.chipTextoActivo,
+                        ]}
+                      >
+                        {t}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {errores.tipo ? (
+                  <Text style={styles.errorTextoWarn}>⚠ {errores.tipo}</Text>
+                ) : null}
+
+                <Text style={styles.label}>Nombre de la actividad *</Text>
+                <TextInput
+                  style={[styles.input, errores.nombre && styles.inputError]}
+                  value={form.nombre}
+                  onChangeText={(t) => {
+                    setForm({ ...form, nombre: t });
+                    if (errores.nombre) setErrores({ ...errores, nombre: null });
+                  }}
+                  placeholder="Ej. Thyro Tabs"
+                  placeholderTextColor="#A0B0AC"
+                />
+                {errores.nombre ? (
+                  <Text style={styles.errorTextoWarn}>⚠ {errores.nombre}</Text>
+                ) : null}
+
+                <View style={styles.filaDos}>
+                  <View style={styles.colMitad}>
+                    <Text style={styles.label}>Hora *</Text>
+                    <TextInput
+                      style={[styles.input, errores.hora && styles.inputError]}
+                      value={form.hora}
+                      onChangeText={(t) => {
+                        setForm({ ...form, hora: t });
+                        if (errores.hora) setErrores({ ...errores, hora: null });
+                      }}
+                      placeholder="7:00 p. m."
+                      placeholderTextColor="#A0B0AC"
+                    />
+                    {errores.hora ? (
+                      <Text style={styles.errorTextoWarn}>⚠ {errores.hora}</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.colMitad}>
+                    <Text style={styles.label}>Fecha *</Text>
+                    <TextInput
+                      style={[styles.input, errores.fecha && styles.inputError]}
+                      value={form.fecha}
+                      onChangeText={(t) => {
+                        setForm({ ...form, fecha: t });
+                        if (errores.fecha) setErrores({ ...errores, fecha: null });
+                      }}
+                      placeholder="22/10/2026"
+                      placeholderTextColor="#A0B0AC"
+                    />
+                    {errores.fecha ? (
+                      <Text style={styles.errorTextoWarn}>⚠ {errores.fecha}</Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                {vista === 'semana' && (
+                  <>
+                    <Text style={styles.label}>Día de la semana *</Text>
+                    <TextInput
+                      style={[styles.input, errores.diaSemana && styles.inputError]}
+                      value={form.diaSemana}
+                      onChangeText={(t) => {
+                        setForm({ ...form, diaSemana: t });
+                        if (errores.diaSemana) setErrores({ ...errores, diaSemana: null });
+                      }}
+                      placeholder="Ej: Lunes, Miércoles"
+                      placeholderTextColor="#A0B0AC"
+                    />
+                    {errores.diaSemana ? (
+                      <Text style={styles.errorTextoWarn}>⚠ {errores.diaSemana}</Text>
+                    ) : null}
+                  </>
+                )}
+
+                <Text style={styles.label}>Repetir</Text>
+                <View style={styles.tiposRow}>
+                  {['Una vez', 'Diario', 'Semanal'].map((r) => (
+                    <Pressable
+                      key={r}
+                      style={[
+                        styles.chipTipo,
+                        form.repeticion === r && styles.chipTipoActivo,
+                      ]}
+                      onPress={() => setForm({ ...form, repeticion: r })}
+                    >
+                      <Text
+                        style={[
+                          styles.chipTexto,
+                          form.repeticion === r && styles.chipTextoActivo,
+                        ]}
+                      >
+                        {r}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={styles.recordatorioCard}>
+                  <Text style={styles.recordatorioIcon}>🔔</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.recordatorioTitulo}>Recordatorio</Text>
+                    <Text style={styles.recordatorioSub}>
+                      {form.recordatorioOn ? form.recordatorio : 'Desactivado'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={form.recordatorioOn}
+                    onValueChange={(v) => setForm({ ...form, recordatorioOn: v })}
+                    trackColor={{ false: '#DDE5E3', true: '#63D6C5' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {form.recordatorioOn && (
+                  <View style={styles.tiposRow}>
+                    {['5 minutos antes', '15 minutos antes', '30 minutos antes', '1 hora antes'].map(
+                      (r) => (
+                        <Pressable
+                          key={r}
+                          style={[
+                            styles.chipTipo,
+                            form.recordatorio === r && styles.chipTipoActivo,
+                          ]}
+                          onPress={() => setForm({ ...form, recordatorio: r })}
+                        >
+                          <Text
+                            style={[
+                              styles.chipTexto,
+                              form.recordatorio === r && styles.chipTextoActivo,
+                            ]}
+                          >
+                            {r}
+                          </Text>
+                        </Pressable>
+                      )
+                    )}
+                  </View>
+                )}
+
+                <Text style={styles.label}>Notas</Text>
+                <TextInput
+                  style={[styles.input, styles.inputNotas]}
+                  value={form.notas}
+                  onChangeText={(t) => setForm({ ...form, notas: t })}
+                  placeholder="Ej. Dar con la comida"
+                  placeholderTextColor="#A0B0AC"
+                  multiline
+                />
+
+                <Pressable style={styles.btnPrimario} onPress={guardarActividad}>
+                  <Text style={styles.btnPrimarioTexto}>
+                    {modoEdicion ? 'Guardar cambios' : 'Guardar actividad'}
+                  </Text>
+                </Pressable>
+
+                <Pressable style={styles.btnSecundario} onPress={cerrarModal}>
+                  <Text style={styles.btnSecundarioTexto}>Cancelar</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* ========== MODAL CONFIRMAR ELIMINAR ========== */}
       <Modal
         visible={confirmarEliminar !== null}
         transparent
@@ -422,8 +617,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4FCFA',
   },
   scrollContent: {
-    padding: 50,
-    paddingBottom: 100,
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 25,
   },
   titulo: {
     fontSize: 22,
@@ -639,8 +835,154 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-
-  // Modal
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#F4FCFA',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    maxHeight: '94%',
+    paddingTop: 8,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+  },
+  backArrow: {
+    fontSize: 22,
+    color: '#173B36',
+    fontWeight: '600',
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#173B36',
+  },
+  label: {
+    fontSize: 12,
+    color: '#526460',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D0E5E0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    color: '#163B37',
+  },
+  inputError: {
+    borderColor: '#E74C3C',
+  },
+  inputNotas: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  errorTextoWarn: {
+    color: '#E74C3C',
+    fontSize: 12,
+    marginTop: -6,
+    marginBottom: 10,
+  },
+  filaDos: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  colMitad: {
+    flex: 1,
+  },
+  tiposRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  chipTipo: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D0E5E0',
+  },
+  chipTipoActivo: {
+    backgroundColor: '#0EAE91',
+    borderColor: '#0EAE91',
+  },
+  chipTexto: {
+    fontSize: 13,
+    color: '#526460',
+  },
+  chipTextoActivo: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  recordatorioCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E8EFED',
+  },
+  recordatorioIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  recordatorioTitulo: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#163B37',
+  },
+  recordatorioSub: {
+    fontSize: 12,
+    color: '#8A9996',
+    marginTop: 2,
+  },
+  btnPrimario: {
+    backgroundColor: '#0EAE91',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  btnPrimarioTexto: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  btnSecundario: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#63DDCA',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnSecundarioTexto: {
+    color: '#0E9F86',
+    fontWeight: '700',
+    fontSize: 15,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -652,52 +994,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 20,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   modalTitulo: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#163B37',
-  },
-  closeText: {
-    fontSize: 18,
-    color: '#A0A0A0',
-  },
-  label: {
-    fontSize: 12,
-    color: '#526460',
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#D0E5E0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 12,
-    backgroundColor: '#FAFFFE',
-    color: '#163B37',
-  },
-  inputError: {
-    borderColor: '#E74C3C',
-  },
-  errorTexto: {
-    color: '#E74C3C',
-    fontSize: 11,
-    marginTop: -8,
     marginBottom: 10,
-  },
-  avisoMascota: {
-    fontSize: 12,
-    color: '#0EAE91',
-    marginBottom: 14,
-    fontWeight: '600',
   },
   textoConfirmar: {
     color: '#526460',
@@ -708,6 +1009,7 @@ const styles = StyleSheet.create({
   botonesForm: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 8,
   },
   botonCancelar: {
     flex: 1,

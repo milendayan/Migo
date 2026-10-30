@@ -15,15 +15,15 @@ export default function App() {
   const renderPantalla = () => {
     switch (pantalla) {
       case 'inicio':
-  return (
-    <InicioScreen
-      onVerTodas={() => setPantalla('mascotas')}
-      onAgregarActividad={() => setPantalla('horario')}
-      onAgregarMascota={() => setPantalla('mascotas')}
-    />
-  );
+        return (
+          <InicioScreen
+            onVerTodas={() => setPantalla('mascotas')}
+            onAgregarActividad={() => setPantalla('horario')}
+            onAgregarMascota={() => setPantalla('mascotas')}
+          />
+        );
       case 'mascotas':
-        return <MisMascotasScreen />;
+        return <MisMascotasScreen onVerHorario={() => setPantalla('horario')} />;
       case 'horario':
         return <HorarioScreen />;
       case 'migo':
@@ -31,26 +31,21 @@ export default function App() {
       case 'perfil':
         return <PerfilScreen />;
       default:
-  return (
-    <InicioScreen
-      onVerTodas={() => setPantalla('mascotas')}
-      onAgregarActividad={() => setPantalla('horario')}
-      onAgregarMascota={() => setPantalla('mascotas')}
-    />
-  );
+        return (
+          <InicioScreen
+            onVerTodas={() => setPantalla('mascotas')}
+            onAgregarActividad={() => setPantalla('horario')}
+            onAgregarMascota={() => setPantalla('mascotas')}
+          />
+        );
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.screen}>
-        {renderPantalla()}
-      </View>
+      <View style={styles.screen}>{renderPantalla()}</View>
 
-      <BottomTabBar
-        pantallaActual={pantalla}
-        onChange={setPantalla}
-      />
+      <BottomTabBar pantallaActual={pantalla} onChange={setPantalla} />
 
       <StatusBar style="auto" />
     </View>

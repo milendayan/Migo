@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 18,
+        paddingTop: 35,
         paddingBottom: 15,
         backgroundColor: '#FFFFFF',
     },
@@ -185,8 +185,9 @@ const styles = StyleSheet.create({
     },
 
     chatContent: {
-        padding: 50,
-        paddingBottom: 20,
+        paddingHorizontal: 20, 
+        paddingTop: 50, 
+        paddingBottom: 25
     },
 
     messageRow: {
@@ -274,5 +275,4 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 20,
     },
-
 });
