@@ -9,10 +9,16 @@ import {
   TextInput,
   Switch,
 } from 'react-native';
+
 import {
   obtenerActividadesHorario,
   TIPOS_ACTIVIDAD,
+  guardarActividadSupabase,
+  actualizarActividadSupabase,
+  cambiarCompletadaSupabase,
+  eliminarActividadSupabase,
 } from '../services/actividadesService';
+
 import { obtenerMascotas } from '../services/mascotasService';
 
 export default function HorarioScreen() {
@@ -22,12 +28,14 @@ export default function HorarioScreen() {
   const [actividades, setActividades] = useState([]);
   const [mostrarSelector, setMostrarSelector] = useState(false);
   const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+const [errorOperacion, setErrorOperacion] = useState('');
 
   const [modalVisible, setModalVisible] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [actividadEditando, setActividadEditando] = useState(null);
   const [form, setForm] = useState({
-    mascotaId: 1,
+    mascotaId: null,
     nombre: '',
     tipo: '',
     hora: '',
@@ -67,24 +75,58 @@ export default function HorarioScreen() {
     cargar();
   }, []);
 
-  const actividadesFiltradas = mascotaSeleccionada
-    ? actividades.filter(
-        (a) => a.mascotaId === mascotaSeleccionada.id && a.dia === vista
-      )
-    : [];
+ 
+const hoy = new Date();
+const fechaHoy = [
+  String(hoy.getDate()).padStart(2, '0'),
+  String(hoy.getMonth() + 1).padStart(2, '0'),
+  hoy.getFullYear(),
+].join('/');
+
+const actividadesFiltradas = mascotaSeleccionada
+  ? actividades.filter((a) => {
+      if (a.mascotaId !== mascotaSeleccionada.id) return false;
+
+      if (vista === 'hoy') {
+        return a.fecha === fechaHoy;
+      }
+
+      // Por ahora, SEMANA muestra las actividades
+      // de fechas distintas de hoy.
+      return a.fecha !== fechaHoy;
+    })
+  : [];
+
 
   const completadas = actividadesFiltradas.filter((a) => a.completada).length;
   const total = actividadesFiltradas.length;
   const porcentaje = total === 0 ? 0 : Math.round((completadas / total) * 100);
 
-  const toggleCompletada = (id) => {
+  
+const toggleCompletada = async (id) => {
+  const actividad = actividades.find((a) => a.id === id);
+  if (!actividad) return;
+
+  try {
+    setErrorOperacion('');
+
+    const nuevoEstado = !actividad.completada;
+
+    await cambiarCompletadaSupabase(id, nuevoEstado);
+
     setActividades((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, completada: !a.completada } : a))
+      prev.map((a) =>
+        a.id === id ? { ...a, completada: nuevoEstado } : a
+      )
     );
-  };
+  } catch (error) {
+    console.error('Error al completar actividad:', error);
+    setErrorOperacion(error.message || 'No se pudo actualizar.');
+  }
+};
 
   const formVacio = () => ({
-    mascotaId: mascotaSeleccionada?.id || 1,
+    mascotaId: mascotaSeleccionada?.id || null,
     nombre: '',
     tipo: '',
     hora: '',
@@ -129,73 +171,104 @@ export default function HorarioScreen() {
     setErrores({});
   };
 
-  const guardarActividad = () => {
-    const nuevosErrores = {};
-    if (!form.mascotaId) nuevosErrores.mascotaId = 'Selecciona una mascota';
-    if (!form.tipo.trim()) nuevosErrores.tipo = 'El tipo es obligatorio';
-    if (!form.nombre.trim()) nuevosErrores.nombre = 'Escribe el nombre de la actividad';
-    if (!form.hora.trim()) nuevosErrores.hora = 'La hora es obligatoria';
-    if (!form.fecha.trim()) nuevosErrores.fecha = 'La fecha es obligatoria';
-    if (vista === 'semana' && !form.diaSemana.trim()) {
-      nuevosErrores.diaSemana = 'El día de la semana es obligatorio';
-    }
+  
+const guardarActividad = async () => {
+  if (guardando) return;
 
-    setErrores(nuevosErrores);
-    if (Object.keys(nuevosErrores).length > 0) return;
+  const nuevosErrores = {};
+
+  if (!form.mascotaId) {
+    nuevosErrores.mascotaId = 'Selecciona una mascota';
+  }
+
+  if (!form.tipo?.trim()) {
+    nuevosErrores.tipo = 'El tipo es obligatorio';
+  }
+
+  if (!form.nombre?.trim()) {
+    nuevosErrores.nombre = 'Escribe el nombre de la actividad';
+  }
+
+  if (!form.hora?.trim()) {
+    nuevosErrores.hora = 'La hora es obligatoria';
+  }
+
+  if (!form.fecha?.trim()) {
+    nuevosErrores.fecha = 'La fecha es obligatoria';
+  }
+
+  setErrores(nuevosErrores);
+
+  if (Object.keys(nuevosErrores).length > 0) return;
+
+  try {
+    setGuardando(true);
+    setErrorOperacion('');
 
     if (modoEdicion && actividadEditando) {
+      const actualizada = await actualizarActividadSupabase(
+        actividadEditando.id,
+        form
+      );
+
       setActividades((prev) =>
         prev.map((a) =>
-          a.id === actividadEditando.id
-            ? {
-                ...a,
-                mascotaId: form.mascotaId,
-                nombre: form.nombre,
-                tipo: form.tipo,
-                hora: form.hora,
-                fecha: form.fecha,
-                repeticion: form.repeticion,
-                recordatorioOn: form.recordatorioOn,
-                recordatorio: form.recordatorio,
-                notas: form.notas,
-                diaSemana: vista === 'semana' ? form.diaSemana : a.diaSemana,
-              }
-            : a
+          a.id === actividadEditando.id ? actualizada : a
         )
       );
     } else {
-      const nueva = {
-        id: Date.now(),
-        mascotaId: form.mascotaId,
-        nombre: form.nombre,
-        tipo: form.tipo,
-        hora: form.hora,
-        fecha: form.fecha,
-        repeticion: form.repeticion,
-        recordatorioOn: form.recordatorioOn,
-        recordatorio: form.recordatorio,
-        notas: form.notas,
-        completada: false,
-        dia: vista,
-        diaSemana: vista === 'semana' ? form.diaSemana : undefined,
-      };
-      setActividades((prev) => [...prev, nueva]);
+      const nueva = await guardarActividadSupabase(form);
+
+      setActividades((prev) =>
+        [...prev, nueva].sort((a, b) => {
+          const fechaA = a.fecha.split('/').reverse().join('-');
+          const fechaB = b.fecha.split('/').reverse().join('-');
+
+          return fechaA.localeCompare(fechaB);
+        })
+      );
     }
 
-    setErrores({});
     cerrarModal();
-  };
+  } catch (error) {
+    console.error('Error al guardar actividad:', error);
+
+    setErrores((prev) => ({
+      ...prev,
+      general: error.message || 'No se pudo guardar la actividad.',
+    }));
+  } finally {
+    setGuardando(false);
+  }
+};
+
+  ///
 
   const solicitarEliminar = (id) => {
     setConfirmarEliminar(id);
   };
 
-  const confirmarBorrado = () => {
-    if (confirmarEliminar) {
-      setActividades((prev) => prev.filter((a) => a.id !== confirmarEliminar));
-      setConfirmarEliminar(null);
-    }
-  };
+
+const confirmarBorrado = async () => {
+  if (confirmarEliminar === null) return;
+
+  try {
+    setErrorOperacion('');
+
+    await eliminarActividadSupabase(confirmarEliminar);
+
+    setActividades((prev) =>
+      prev.filter((a) => a.id !== confirmarEliminar)
+    );
+
+    setConfirmarEliminar(null);
+  } catch (error) {
+    console.error('Error al eliminar actividad:', error);
+    setErrorOperacion(error.message || 'No se pudo eliminar.');
+    setConfirmarEliminar(null);
+  }
+};
+
 
   if (cargando || !mascotaSeleccionada) {
     return (
@@ -219,6 +292,11 @@ export default function HorarioScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <Text style={styles.titulo}>Horario de cuidado</Text>
+      {errorOperacion ? (
+  <Text style={styles.errorTextoWarn}>
+    ⚠ {errorOperacion}
+  </Text>
+) : null}
 
         <View style={styles.selectorRow}>
           <Text style={styles.labelSelector}>Horario de:</Text>
@@ -563,11 +641,30 @@ export default function HorarioScreen() {
                   multiline
                 />
 
-                <Pressable style={styles.btnPrimario} onPress={guardarActividad}>
-                  <Text style={styles.btnPrimarioTexto}>
-                    {modoEdicion ? 'Guardar cambios' : 'Guardar actividad'}
-                  </Text>
-                </Pressable>
+               
+{errores.general ? (
+  <Text style={styles.errorTextoWarn}>
+    ⚠ {errores.general}
+  </Text>
+) : null}
+
+<Pressable
+  style={[
+    styles.btnPrimario,
+    guardando && { opacity: 0.6 },
+  ]}
+  onPress={guardarActividad}
+  disabled={guardando}
+>
+  <Text style={styles.btnPrimarioTexto}>
+    {guardando
+      ? 'Guardando...'
+      : modoEdicion
+      ? 'Guardar cambios'
+      : 'Guardar actividad'}
+  </Text>
+</Pressable>
+
 
                 <Pressable style={styles.btnSecundario} onPress={cerrarModal}>
                   <Text style={styles.btnSecundarioTexto}>Cancelar</Text>

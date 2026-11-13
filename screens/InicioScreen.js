@@ -17,8 +17,10 @@ import SecondaryButton from '../components/SecondaryButton';
 
 import { obtenerMascotas } from '../services/mascotasService';
 import { obtenerActividades } from '../services/actividadesService';
+import { supabase } from '../services/supabaseClient';
 
 export default function InicioScreen({ onVerTodas, onAgregarActividad, onAgregarMascota }) {
+    const [nombreUsuario, setNombreUsuario] = useState('Usuario');
     const [mascotas, setMascotas] = useState([]);
     const [actividades, setActividades] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -27,24 +29,48 @@ export default function InicioScreen({ onVerTodas, onAgregarActividad, onAgregar
     const [modalVisible, setModalVisible] = useState(false);
     const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
 
-    useEffect(() => {
-        const cargarDatos = async () => {
-            try {
-                const [mascotasData, actividadesData] = await Promise.all([
-                    obtenerMascotas(),
-                    obtenerActividades(),
-                ]);
-                setMascotas(mascotasData);
-                setActividades(actividadesData);
-            } catch (error) {
-                console.log('Error al cargar datos:', error);
-            } finally {
-                setCargando(false);
-            }
-        };
+    
+useEffect(() => {
+    const cargarDatos = async () => {
+        try {
+            // Obtener el usuario que inició sesión en Supabase
+            const {
+                data: { user },
+                error: errorUsuario,
+            } = await supabase.auth.getUser();
 
-        cargarDatos();
-    }, []);
+            if (errorUsuario) {
+                console.log('Error al obtener usuario:', errorUsuario.message);
+            }
+
+            // Mostrar el nombre real del usuario
+            if (user) {
+                setNombreUsuario(
+                    user.user_metadata?.nombre ||
+                    user.email?.split('@')[0] ||
+                    'Usuario'
+                );
+            }
+
+            // Cargar mascotas y actividades
+            const [mascotasData, actividadesData] = await Promise.all([
+                obtenerMascotas(),
+                obtenerActividades(),
+            ]);
+
+            setMascotas(mascotasData);
+            setActividades(actividadesData);
+
+        } catch (error) {
+            console.log('Error al cargar datos:', error);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    cargarDatos();
+}, []);
+
 
     const abrirDetalle = (mascota) => {
         setMascotaSeleccionada(mascota);
@@ -74,7 +100,7 @@ export default function InicioScreen({ onVerTodas, onAgregarActividad, onAgregar
                 {/* Encabezado */}
                 <View style={styles.header}>
                     <Text style={styles.fecha}>Jueves, 3 de septiembre</Text>
-                    <Text style={styles.saludo}>Hola, Paula 👋</Text>
+                    <Text style={styles.saludo}>Hola, {nombreUsuario} 👋</Text>
                     <Text style={styles.subtitulo}>
                         Así va el cuidado de tus mascotas hoy
                     </Text>

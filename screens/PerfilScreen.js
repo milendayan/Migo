@@ -10,6 +10,8 @@ import {
   TextInput,
 } from 'react-native';
 import { obtenerPerfil } from '../services/perfilService';
+import { supabase } from '../services/supabaseClient';
+import { obtenerMascotas } from '../services/mascotasService';
 
 export default function PerfilScreen() {
   const [usuario, setUsuario] = useState({
@@ -50,9 +52,83 @@ export default function PerfilScreen() {
     const cargar = async () => {
       try {
         const data = await obtenerPerfil();
-        setUsuario(data.usuario);
-        setEstadisticas(data.estadisticas);
-        setNotificaciones(data.notificaciones);
+        
+// Obtener el usuario que inició sesión.
+const {
+  data: { user },
+  error,
+} = await supabase.auth.getUser();
+
+if (error) {
+  console.log('Error al obtener usuario:', error.message);
+}
+
+
+if (user) {
+  // Obtener mascotas y actividades reales del usuario.
+  const mascotas = await obtenerMascotas();
+
+  const { data: actividades, error: errorActividades } =
+    await supabase
+      .from('actividades')
+      .select('id, fecha, completada')
+      .eq('usuario_id', user.id);
+
+  if (errorActividades) throw errorActividades;
+
+  const listaActividades = actividades || [];
+  const realizadas = listaActividades.filter(
+    (actividad) => actividad.completada
+  ).length;
+
+  const total = listaActividades.length;
+
+  const tasaCumplimiento =
+    total > 0 ? Math.round((realizadas / total) * 100) : 0;
+
+  // Contar fechas diferentes con actividades registradas.
+  const diasSeguimiento = new Set(
+    listaActividades.map((actividad) => actividad.fecha)
+  ).size;
+
+  setUsuario({
+    nombre:
+      user.user_metadata?.nombre ||
+      user.email?.split('@')[0] ||
+      'Usuario',
+    email: user.email || '',
+    mascotas: mascotas.length,
+    emoji: '👤',
+  });
+
+  setEstadisticas({
+    actividadesRealizadas: realizadas,
+    tasaCumplimiento,
+    diasSeguimiento,
+  });
+} else {
+  setUsuario({
+    nombre: 'Usuario',
+    email: '',
+    mascotas: 0,
+    emoji: '👤',
+  });
+
+  setEstadisticas({
+    actividadesRealizadas: 0,
+    tasaCumplimiento: 0,
+    diasSeguimiento: 0,
+  });
+}
+
+
+// Estadísticas y notificaciones vacías por ahora,
+// hasta conectarlas con los datos reales del usuario.
+
+setNotificaciones([]);
+
+
+
         setRecordatorios(data.preferencias.recordatorios);
         setTiempoRecordatorio(data.preferencias.tiempoRecordatorio);
         setNotificacionesPush(data.preferencias.notificacionesPush);
@@ -196,6 +272,9 @@ export default function PerfilScreen() {
 
           <View style={styles.separator} />
 
+          {/* Cerrar sesión */}
+ 
+
           {/* Notificaciones push */}
           <View style={styles.settingRow}>
             <Text style={styles.settingIcon}>📱</Text>
@@ -305,6 +384,19 @@ export default function PerfilScreen() {
           ))}
         </View>
       </ScrollView>
+
+<Pressable
+  style={styles.logoutButton}
+  onPress={async () => {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.log('Error al cerrar sesión:', error.message);
+    }
+  }}
+>
+  <Text style={styles.logoutText}>Cerrar sesión</Text>
+</Pressable>   
 
       {/* ========== MODAL EDITAR PERFIL ========== */}
       <Modal visible={modalEditar} transparent animationType="slide">
@@ -839,4 +931,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#163B37',
   },
+logoutButton: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#0EAE91',
+  borderRadius: 12,
+  paddingVertical: 15,
+  alignItems: 'center',
+  marginBottom: 16,
+},
+logoutText: {
+  color: '#0EAE91',
+  fontSize: 14,
+  fontWeight: 'bold',
+},
+
 });
