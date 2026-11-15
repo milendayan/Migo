@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { supabase } from '../services/supabaseClient';
+import { registrarUsuario as registrarUsuarioApi } from '../services/usuarioService';
 
 export default function RegistroScreen({ onGoToLogin }) {
   const [nombre, setNombre] = useState('');
@@ -47,31 +47,11 @@ export default function RegistroScreen({ onGoToLogin }) {
     setLoading(true);
 
     try {
-      const { data, error: registroError } =
-        await supabase.auth.signUp({
-          email: email.trim().toLowerCase(),
-          password,
-          options: {
-            data: {
-              nombre: nombre.trim(),
-            },
-          },
-        });
-
-      if (registroError) {
-        setError(registroError.message);
-        return;
-      }
-
-      if (data.session) {
-        setMensaje('¡Cuenta creada correctamente!');
-      } else {
-        setMensaje(
-          'Revisa tu correo electrónico y confirma tu cuenta. Después podrás iniciar sesión.'
-        );
-      }
+      // POST /api/auth/registro. Queda con la sesión iniciada.
+      await registrarUsuarioApi(nombre.trim(), email.trim().toLowerCase(), password);
+      setMensaje('¡Cuenta creada correctamente!');
     } catch (e) {
-      setError('No se pudo conectar. Inténtalo nuevamente.');
+      setError(e.message); // por ejemplo: "Ya existe una cuenta con ese correo."
     } finally {
       setLoading(false);
     }

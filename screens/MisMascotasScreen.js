@@ -9,7 +9,13 @@ import {
     Modal,
     TextInput,
 } from 'react-native';
-import { obtenerMascotas, obtenerHistorial } from '../services/mascotasService';
+import {
+    obtenerMascotas,
+    obtenerHistorial,
+    guardarMascota as guardarMascotaApi,
+    actualizarMascota,
+    agregarRegistroHistorial,
+} from '../services/mascotasService';
 
 export default function MisMascotasScreen({ onVerHorario }) {
     const [mascotas, setMascotas] = useState([]);
@@ -36,6 +42,7 @@ const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
         notas: '',
     });
     const [erroresAgregar, setErroresAgregar] = useState({});
+    const [errorApi, setErrorApi] = useState(''); // errores que devuelve el servidor
 
     const [modalHistorialVisible, setModalHistorialVisible] = useState(false);
     const [modalAgregarRegistro, setModalAgregarRegistro] = useState(false);
@@ -55,12 +62,8 @@ const [modalPerfilVisible, setModalPerfilVisible] = useState(false);
     useEffect(() => {
         const cargar = async () => {
             try {
-                const [lista, hist] = await Promise.all([
-                    obtenerMascotas(),
-                    obtenerHistorial(),
-                ]);
+                const lista = await obtenerMascotas();
                 setMascotas(lista);
-                setHistorial(hist);
             } catch (e) {
                 console.log('Error al cargar mascotas:', e);
             } finally {
@@ -88,6 +91,7 @@ const abrirPerfil = (mascota) => {
     const activarEdicion = () => {
         setFormEditar({ ...mascotaSeleccionada });
         setErroresEditar({});
+        setErrorApi('');
         setModoEdicion(true);
     };
 
@@ -122,18 +126,28 @@ const abrirPerfil = (mascota) => {
     return errores;
 };
 
-    const guardarEdicion = () => {
+    // PUT /api/mascotas/{id}
+    const guardarEdicion = async () => {
         const errores = validarCampos(formEditar, false);
         setErroresEditar(errores);
         if (Object.keys(errores).length > 0) return;
 
-        const actualizadas = mascotas.map((m) =>
-            m.id === formEditar.id ? { ...formEditar } : m
-        );
-        setMascotas(actualizadas);
-        setMascotaSeleccionada({ ...formEditar });
-        setModoEdicion(false);
-        setErroresEditar({});
+        try {
+            setErrorApi('');
+            const guardada = await actualizarMascota(formEditar.id, formEditar);
+            // Se conserva el progreso del día que ya se había calculado
+            const actualizada = { ...mascotaSeleccionada, ...guardada,
+                actividades: mascotaSeleccionada.actividades,
+                progreso: mascotaSeleccionada.progreso,
+                pendientes: mascotaSeleccionada.pendientes,
+                proximaActividad: mascotaSeleccionada.proximaActividad };
+            setMascotas(mascotas.map((m) => (m.id === actualizada.id ? actualizada : m)));
+            setMascotaSeleccionada(actualizada);
+            setModoEdicion(false);
+            setErroresEditar({});
+        } catch (e) {
+            setErrorApi(e.message);
+        }
     };
 
     const abrirAgregar = () => {
@@ -150,6 +164,7 @@ const abrirPerfil = (mascota) => {
             notas: '',
         });
         setErroresAgregar({});
+        setErrorApi('');
         setModalAgregarVisible(true);
     };
 
@@ -158,41 +173,21 @@ const abrirPerfil = (mascota) => {
         setErroresAgregar({});
     };
 
-    const guardarMascota = () => {
+    // POST /api/mascotas
+    const guardarMascota = async () => {
         const errores = validarCampos(nuevaMascota, true);
         setErroresAgregar(errores);
         if (Object.keys(errores).length > 0) return;
 
-        const id = Date.now();
-        const pesoLimpio = parseFloat(
-            String(nuevaMascota.peso).replace(',', '.').replace(/[^\d.]/g, '')
-        );
-        const mascotaNueva = {
-            id,
-            nombre: nuevaMascota.nombre,
-            especie: nuevaMascota.especie,
-            raza: nuevaMascota.raza || '—',
-            edad: nuevaMascota.edad || '—',
-            peso: `${pesoLimpio} kg`,
-            sexo: nuevaMascota.sexo || '—',
-            color: nuevaMascota.color || '—',
-            fechaNacimiento: nuevaMascota.fechaNacimiento,
-            microchip: nuevaMascota.microchip || '—',
-            notas: nuevaMascota.notas || '',
-            actividades: '0 de 0 actividades',
-            progreso: 0,
-            pendientes: '0 pendientes',
-            proximaActividad: 'Sin actividades',
-            imagen: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=800',
-        };
-
-        setMascotas([...mascotas, mascotaNueva]);
-        setHistorial({
-            ...historial,
-            [id]: { vacunas: [], citas: [], pesos: [] },
-        });
-        setModalAgregarVisible(false);
-        setErroresAgregar({});
+        try {
+            setErrorApi('');
+            const mascotaNueva = await guardarMascotaApi(nuevaMascota);
+            setMascotas([...mascotas, mascotaNueva]);
+            setModalAgregarVisible(false);
+            setErroresAgregar({});
+        } catch (e) {
+            setErrorApi(e.message);
+        }
     };
 
     const actualizarCampoAgregar = (campo, valor) => {
@@ -209,8 +204,19 @@ const abrirPerfil = (mascota) => {
         }
     };
 
-    const abrirHistorial = () => {
+    // GET /api/mascotas/{id}/historial
+    const cargarHistorial = async (mascotaId) => {
+        const datos = await obtenerHistorial(mascotaId);
+        setHistorial((anterior) => ({ ...anterior, [mascotaId]: datos }));
+    };
+
+    const abrirHistorial = async () => {
         setModalHistorialVisible(true);
+        try {
+            await cargarHistorial(mascotaSeleccionada.id);
+        } catch (e) {
+            console.log('Error al cargar historial:', e.message);
+        }
     };
 
     const cerrarHistorial = () => {
@@ -236,55 +242,22 @@ const abrirPerfil = (mascota) => {
             valor: '',
             mes: '',
         });
+        setErrorApi('');
         setModalAgregarRegistro(true);
     };
 
-    const guardarRegistro = () => {
+    // POST /api/mascotas/{id}/historial
+    const guardarRegistro = async () => {
         if (!mascotaSeleccionada) return;
-        const id = mascotaSeleccionada.id;
-        const actual = historial[id] || { vacunas: [], citas: [], pesos: [] };
 
-        if (tipoRegistro === 'vacuna') {
-            if (!formRegistro.nombre.trim() || !formRegistro.fecha.trim()) return;
-            const estado = formRegistro.estado || 'Al día';
-            actual.vacunas = [
-                ...actual.vacunas,
-                {
-                    id: Date.now(),
-                    nombre: formRegistro.nombre,
-                    fecha: formRegistro.fecha,
-                    estado,
-                    detalle: estado === 'Pendiente' ? `Próxima: ${formRegistro.fecha}` : `Aplicada: ${formRegistro.fecha}`,
-                    icono: '💉',
-                },
-            ];
-        } else if (tipoRegistro === 'cita') {
-            if (!formRegistro.tipo.trim() || !formRegistro.fecha.trim()) return;
-            actual.citas = [
-                ...actual.citas,
-                {
-                    id: Date.now(),
-                    tipo: formRegistro.tipo,
-                    fecha: formRegistro.fecha,
-                    hora: formRegistro.hora || '',
-                    veterinario: formRegistro.veterinario || '—',
-                    estado: formRegistro.estadoCita || 'Próxima',
-                    icono: '🩺',
-                },
-            ];
-        } else if (tipoRegistro === 'peso') {
-            if (!formRegistro.mes.trim() || !formRegistro.valor.trim()) return;
-            actual.pesos = [
-                ...actual.pesos,
-                {
-                    mes: formRegistro.mes,
-                    valor: parseFloat(formRegistro.valor) || 0,
-                },
-            ];
+        try {
+            setErrorApi('');
+            await agregarRegistroHistorial(mascotaSeleccionada.id, tipoRegistro, formRegistro);
+            await cargarHistorial(mascotaSeleccionada.id);
+            setModalAgregarRegistro(false);
+        } catch (e) {
+            setErrorApi(e.message);
         }
-
-        setHistorial({ ...historial, [id]: actual });
-        setModalAgregarRegistro(false);
     };
 
     const datosHistorial = mascotaSeleccionada
@@ -470,6 +443,8 @@ const abrirPerfil = (mascota) => {
                                                 placeholder="Notas (opcional)"
                                                 multiline
                                             />
+
+                                            {errorApi ? <Text style={styles.errorTexto}>{errorApi}</Text> : null}
 
                                             <View style={styles.botonesForm}>
                                                 <Pressable style={styles.botonCancelar} onPress={cancelarEdicion}>
@@ -746,7 +721,19 @@ const abrirPerfil = (mascota) => {
                                     style={styles.btnPrimario}
                                     onPress={() => abrirAgregarRegistro('vacuna')}
                                 >
-                                    <Text style={styles.btnPrimarioTexto}>+ Agregar registro</Text>
+                                    <Text style={styles.btnPrimarioTexto}>+ Agregar vacuna</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={styles.btnSecundario}
+                                    onPress={() => abrirAgregarRegistro('cita')}
+                                >
+                                    <Text style={styles.btnSecundarioTexto}>+ Agregar cita</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={styles.btnSecundario}
+                                    onPress={() => abrirAgregarRegistro('peso')}
+                                >
+                                    <Text style={styles.btnSecundarioTexto}>+ Agregar registro de peso</Text>
                                 </Pressable>
                             </View>
                         </ScrollView>
@@ -860,6 +847,8 @@ const abrirPerfil = (mascota) => {
                                 />
                             </>
                         )}
+
+                        {errorApi ? <Text style={styles.errorTexto}>{errorApi}</Text> : null}
 
                         <View style={styles.botonesForm}>
                             <Pressable
@@ -1007,6 +996,8 @@ const abrirPerfil = (mascota) => {
                     />
 
                     <Text style={styles.notaObligatorios}>* Campos obligatorios</Text>
+
+                    {errorApi ? <Text style={styles.errorTexto}>{errorApi}</Text> : null}
 
                     <Pressable style={styles.btnPrimario} onPress={guardarMascota}>
                         <Text style={styles.btnPrimarioTexto}>Guardar mascota</Text>

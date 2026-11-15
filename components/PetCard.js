@@ -13,10 +13,10 @@ export default function PetCard({ mascota, onPress }) {
           {mascota.especie} • {mascota.raza}
         </Text>
         <Text style={styles.actividades}>{mascota.actividades}</Text>
-        <Text style={styles.porcentaje}>{mascota.progreso}</Text>
+        <Text style={styles.porcentaje}>{mascota.progreso}%</Text>
 
         <View style={styles.progressBg}>
-          <View style={[styles.progress, { width: mascota.progreso }]} />
+          <View style={[styles.progress, { width: `${mascota.progreso}%` }]} />
         </View>
 
         <View style={styles.proxima}>

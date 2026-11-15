@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { supabase } from '../services/supabaseClient';
+import { iniciarSesionUsuario } from '../services/usuarioService';
 
 export default function LoginScreen({ onGoToRegister }) {
   const [email, setEmail] = useState('');
@@ -29,19 +29,10 @@ export default function LoginScreen({ onGoToRegister }) {
     setLoading(true);
 
     try {
-      const { error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-
-      if (authError) {
-        setError(
-          'No se pudo iniciar sesión. Verifica tus datos y confirma tu correo.'
-        );
-      }
+      // POST /api/auth/login. Si es correcto, App.js muestra la app.
+      await iniciarSesionUsuario(email.trim().toLowerCase(), password);
     } catch (e) {
-      setError('Error de conexión. Inténtalo nuevamente.');
+      setError(e.message); // mensaje que envía el servidor
     } finally {
       setLoading(false);
     }

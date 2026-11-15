@@ -1,0 +1,63 @@
+{
+  "_descripcion": "Base de datos de MIGO en Firebase Cloud Firestore (NoSQL). Firestore no usa scripts SQL: las colecciones se crean solas cuando el backend guarda el primer documento. Este archivo muestra la estructura y un documento de ejemplo por colección. El id de cada documento lo genera Firestore.",
+
+  "usuarios": {
+    "ID_GENERADO_POR_FIRESTORE": {
+      "nombre": "Paula Rodríguez",
+      "email": "paula@ejemplo.com",
+      "password": "SAL_BASE64:HASH_PBKDF2_BASE64",
+      "recordatorios": true,
+      "tiempoRecordatorio": "15",
+      "notificacionesPush": true,
+      "modoSilencioso": false,
+      "horaInicioSilencio": "10:00 p. m.",
+      "horaFinSilencio": "7:00 a. m."
+    }
+  },
+
+  "mascotas": {
+    "ID_GENERADO_POR_FIRESTORE": {
+      "usuarioId": "ID_DEL_USUARIO",
+      "nombre": "Max",
+      "especie": "Perro",
+      "raza": "Golden Retriever",
+      "sexo": "Macho",
+      "fechaNacimiento": "2021-03-15",
+      "peso": 28.5,
+      "color": "Dorado",
+      "microchip": "",
+      "notas": ""
+    }
+  },
+
+  "actividades": {
+    "ID_GENERADO_POR_FIRESTORE": {
+      "usuarioId": "ID_DEL_USUARIO",
+      "mascotaId": "ID_DE_LA_MASCOTA",
+      "nombre": "Paseo de la tarde",
+      "tipo": "Paseo",
+      "fecha": "2026-11-19",
+      "hora": "17:30",
+      "repetir": "Diario",
+      "recordatorioActivo": true,
+      "minutosAntes": 15,
+      "notas": "",
+      "completada": false
+    }
+  },
+
+  "historial": {
+    "ID_GENERADO_POR_FIRESTORE": {
+      "mascotaId": "ID_DE_LA_MASCOTA",
+      "categoria": "vacuna",
+      "nombre": "Rabia",
+      "fecha": "10/11/2026",
+      "estado": "Al día",
+      "hora": "",
+      "veterinario": "",
+      "mes": "",
+      "valor": null,
+      "creadoEn": 1763400000000
+    }
+  }
+}

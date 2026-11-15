@@ -17,7 +17,16 @@ import SecondaryButton from '../components/SecondaryButton';
 
 import { obtenerMascotas } from '../services/mascotasService';
 import { obtenerActividades } from '../services/actividadesService';
-import { supabase } from '../services/supabaseClient';
+import { obtenerUsuarioActual } from '../services/sesionService';
+
+// Ejemplo: "Domingo, 15 de noviembre"
+const fechaDeHoy = () => {
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+        'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const hoy = new Date();
+    return `${dias[hoy.getDay()]}, ${hoy.getDate()} de ${meses[hoy.getMonth()]}`;
+};
 
 export default function InicioScreen({ onVerTodas, onAgregarActividad, onAgregarMascota }) {
     const [nombreUsuario, setNombreUsuario] = useState('Usuario');
@@ -33,23 +42,10 @@ export default function InicioScreen({ onVerTodas, onAgregarActividad, onAgregar
 useEffect(() => {
     const cargarDatos = async () => {
         try {
-            // Obtener el usuario que inició sesión en Supabase
-            const {
-                data: { user },
-                error: errorUsuario,
-            } = await supabase.auth.getUser();
-
-            if (errorUsuario) {
-                console.log('Error al obtener usuario:', errorUsuario.message);
-            }
-
-            // Mostrar el nombre real del usuario
-            if (user) {
-                setNombreUsuario(
-                    user.user_metadata?.nombre ||
-                    user.email?.split('@')[0] ||
-                    'Usuario'
-                );
+            // Nombre del usuario que inició sesión
+            const usuario = obtenerUsuarioActual();
+            if (usuario) {
+                setNombreUsuario(usuario.nombre.split(' ')[0]);
             }
 
             // Cargar mascotas y actividades
@@ -99,7 +95,7 @@ useEffect(() => {
             >
                 {/* Encabezado */}
                 <View style={styles.header}>
-                    <Text style={styles.fecha}>Jueves, 3 de septiembre</Text>
+                    <Text style={styles.fecha}>{fechaDeHoy()}</Text>
                     <Text style={styles.saludo}>Hola, {nombreUsuario} 👋</Text>
                     <Text style={styles.subtitulo}>
                         Así va el cuidado de tus mascotas hoy

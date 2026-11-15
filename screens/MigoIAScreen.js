@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -5,32 +6,56 @@ import {
     ScrollView,
     TextInput,
     Pressable,
+    ActivityIndicator,
 } from 'react-native';
 
+import { preguntarMigoIA } from '../services/iaService';
+
+const SALUDO =
+    '¡Hola! Soy MIGO IA, tu asistente de bienestar para mascotas. ' +
+    'Puedo ayudarte con dudas generales sobre el cuidado de tus animales. ' +
+    '¿En qué puedo orientarte hoy?';
+
 export default function MigoIAScreen() {
+    // Conversación: [{ rol: 'usuario' | 'migo', texto }]
+    const [mensajes, setMensajes] = useState([{ rol: 'migo', texto: SALUDO }]);
+    const [pregunta, setPregunta] = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const scrollRef = useRef(null);
+
+    // POST /api/ia/chat
+    const enviar = async () => {
+        const texto = pregunta.trim();
+        if (!texto || enviando) return;
+
+        const conversacion = [...mensajes, { rol: 'usuario', texto }];
+        setMensajes(conversacion);
+        setPregunta('');
+        setEnviando(true);
+
+        try {
+            // El saludo inicial no se envía; solo la conversación real
+            const respuesta = await preguntarMigoIA(conversacion.slice(1));
+            setMensajes([...conversacion, { rol: 'migo', texto: respuesta }]);
+        } catch (e) {
+            setMensajes([...conversacion, { rol: 'migo', texto: `⚠ ${e.message}` }]);
+        } finally {
+            setEnviando(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
 
             {/* Encabezado */}
             <View style={styles.header}>
-
                 <View style={styles.logo}>
-                    <Text style={styles.logoText}>
-                        ✨
-                    </Text>
+                    <Text style={styles.logoText}>✨</Text>
                 </View>
-
                 <View>
-                    <Text style={styles.title}>
-                        MIGO IA
-                    </Text>
-
-                    <Text style={styles.status}>
-                        ● En línea
-                    </Text>
+                    <Text style={styles.title}>MIGO IA</Text>
+                    <Text style={styles.status}>● En línea</Text>
                 </View>
-
             </View>
 
             {/* Aviso */}
@@ -43,76 +68,60 @@ export default function MigoIAScreen() {
 
             {/* Conversación */}
             <ScrollView
+                ref={scrollRef}
                 style={styles.chat}
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
             >
+                {mensajes.map((m, index) =>
+                    m.rol === 'usuario' ? (
+                        <View key={index} style={styles.userMessage}>
+                            <Text style={styles.userMessageText}>{m.texto}</Text>
+                        </View>
+                    ) : (
+                        <View key={index} style={styles.messageRow}>
+                            <View style={styles.smallLogo}>
+                                <Text>✨</Text>
+                            </View>
+                            <View style={styles.migoMessage}>
+                                <Text style={styles.messageText}>{m.texto}</Text>
+                            </View>
+                        </View>
+                    )
+                )}
 
-                {/* Mensaje MIGO */}
-                <View style={styles.messageRow}>
-
-                    <View style={styles.smallLogo}>
-                        <Text>✨</Text>
+                {enviando && (
+                    <View style={styles.messageRow}>
+                        <View style={styles.smallLogo}>
+                            <Text>✨</Text>
+                        </View>
+                        <View style={styles.migoMessage}>
+                            <ActivityIndicator size="small" color="#0EAE91" />
+                        </View>
                     </View>
-
-                    <View style={styles.migoMessage}>
-                        <Text style={styles.messageText}>
-                            ¡Hola! Soy MIGO IA, tu asistente de
-                            bienestar para mascotas. Puedo ayudarte
-                            con dudas generales sobre el cuidado de
-                            tus animales. ¿En qué puedo orientarte hoy?
-                        </Text>
-                    </View>
-
-                </View>
-
-                {/* Mensaje usuario */}
-                <View style={styles.userMessage}>
-                    <Text style={styles.userMessageText}>
-                        ¿Cada cuánto debo bañar a mi mascota?
-                    </Text>
-                </View>
-
-                {/* Respuesta MIGO */}
-                <View style={styles.messageRow}>
-
-                    <View style={styles.smallLogo}>
-                        <Text>✨</Text>
-                    </View>
-
-                    <View style={styles.migoMessage}>
-                        <Text style={styles.messageText}>
-                            Las gatas generalmente se limpian solas 
-                            y no necesitan baños frecuentes.
-                            En casos normales, solo se recomienda bañarlos
-                            si están muy sucios o tienen parásitos.
-                            Puedes hacerlos con productos
-                            especializados para gatos cada 4-6 semanas
-                            si es necesario. ¿Tu gata tiene alguna 
-                            condición especial?
-                        </Text>
-
-                    </View>
-
-                </View>
-
+                )}
             </ScrollView>
 
             {/* Campo de mensaje */}
             <View style={styles.inputContainer}>
-
                 <TextInput
                     style={styles.input}
                     placeholder="Escribe tu pregunta..."
                     placeholderTextColor="#9AA8A5"
+                    value={pregunta}
+                    onChangeText={setPregunta}
+                    onSubmitEditing={enviar}
+                    maxLength={1000}
+                    editable={!enviando}
                 />
-
-                <Pressable style={styles.sendButton}>
-                    <Text style={styles.sendText}>
-                        ➤
-                    </Text>
+                <Pressable
+                    style={[styles.sendButton, (!pregunta.trim() || enviando) && { opacity: 0.5 }]}
+                    onPress={enviar}
+                    disabled={!pregunta.trim() || enviando}
+                >
+                    <Text style={styles.sendText}>➤</Text>
                 </Pressable>
-
             </View>
 
         </View>

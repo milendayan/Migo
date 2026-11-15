@@ -1,0 +1,7 @@
+.gradle/
+build/
+.idea/
+.kotlin/
+*.iml
+# Credenciales: NUNCA subir
+serviceAccountKey.json

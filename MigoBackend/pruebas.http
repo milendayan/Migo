@@ -1,0 +1,115 @@
+### Pruebas de la API de MIGO (se ejecutan desde IntelliJ con el botón ▶ de cada bloque)
+### Cambia {{usuarioId}}, {{mascotaId}} y {{actividadId}} por los id que devuelve el servidor.
+
+@url = http://localhost:8080/api
+@usuarioId = PEGAR_ID_USUARIO
+@mascotaId = PEGAR_ID_MASCOTA
+@actividadId = PEGAR_ID_ACTIVIDAD
+
+### API-01 Registrar usuario
+POST {{url}}/auth/registro
+Content-Type: application/json
+
+{ "nombre": "Paula Rodríguez", "email": "paula@ejemplo.com", "password": "12345678" }
+
+### API-02 Iniciar sesión
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{ "email": "paula@ejemplo.com", "password": "12345678" }
+
+### API-02 Error: contraseña incorrecta (debe responder 401)
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{ "email": "paula@ejemplo.com", "password": "otraclave" }
+
+### API-03 Consultar perfil
+GET {{url}}/usuarios/{{usuarioId}}
+
+### API-04 Actualizar perfil y preferencias
+PUT {{url}}/usuarios/{{usuarioId}}
+Content-Type: application/json
+
+{ "nombre": "Paula R.", "email": "paula@ejemplo.com", "recordatorios": true, "tiempoRecordatorio": "30",
+  "notificacionesPush": true, "modoSilencioso": false, "horaInicioSilencio": "10:00 p. m.", "horaFinSilencio": "7:00 a. m." }
+
+### API-05 Registrar mascota
+POST {{url}}/mascotas
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "nombre": "Max", "especie": "Perro", "raza": "Golden Retriever",
+  "sexo": "Macho", "fechaNacimiento": "2021-03-15", "peso": 28.5, "color": "Dorado" }
+
+### API-05 Error: mascota sin nombre (debe responder 400)
+POST {{url}}/mascotas
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "nombre": "", "especie": "Perro" }
+
+### API-06 Consultar mascotas del usuario
+GET {{url}}/mascotas?usuarioId={{usuarioId}}
+
+### API-07 Consultar una mascota
+GET {{url}}/mascotas/{{mascotaId}}
+
+### API-08 Actualizar mascota
+PUT {{url}}/mascotas/{{mascotaId}}
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "nombre": "Max", "especie": "Perro", "raza": "Golden Retriever",
+  "sexo": "Macho", "fechaNacimiento": "2021-03-15", "peso": 29.1, "color": "Dorado" }
+
+### API-09 Agregar vacuna al historial
+POST {{url}}/mascotas/{{mascotaId}}/historial
+Content-Type: application/json
+
+{ "categoria": "vacuna", "nombre": "Rabia", "fecha": "10/11/2026", "estado": "Al día" }
+
+### API-09 Agregar registro de peso
+POST {{url}}/mascotas/{{mascotaId}}/historial
+Content-Type: application/json
+
+{ "categoria": "peso", "mes": "Nov", "valor": 29.1 }
+
+### API-10 Consultar historial médico
+GET {{url}}/mascotas/{{mascotaId}}/historial
+
+### API-11 Registrar actividad
+POST {{url}}/actividades
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "mascotaId": "{{mascotaId}}", "nombre": "Paseo de la tarde", "tipo": "Paseo",
+  "fecha": "2026-11-19", "hora": "17:30", "repetir": "Diario", "recordatorioActivo": true, "minutosAntes": 15 }
+
+### API-11 Error: hora inválida (debe responder 400)
+POST {{url}}/actividades
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "mascotaId": "{{mascotaId}}", "nombre": "Paseo", "tipo": "Paseo",
+  "fecha": "2026-11-19", "hora": "25:00" }
+
+### API-12 Consultar actividades del usuario
+GET {{url}}/actividades?usuarioId={{usuarioId}}
+
+### API-13 Actualizar actividad
+PUT {{url}}/actividades/{{actividadId}}
+Content-Type: application/json
+
+{ "usuarioId": "{{usuarioId}}", "mascotaId": "{{mascotaId}}", "nombre": "Paseo largo", "tipo": "Paseo",
+  "fecha": "2026-11-19", "hora": "18:00", "repetir": "Diario", "recordatorioActivo": true, "minutosAntes": 30 }
+
+### API-14 Marcar actividad como completada
+PUT {{url}}/actividades/{{actividadId}}/completada?usuarioId={{usuarioId}}
+Content-Type: application/json
+
+{ "completada": true }
+
+### API-15 Eliminar actividad
+DELETE {{url}}/actividades/{{actividadId}}?usuarioId={{usuarioId}}
+
+### API-16 Preguntar a MIGO IA
+POST {{url}}/ia/chat
+Content-Type: application/json
+
+{ "mensajes": [ { "rol": "usuario", "texto": "¿Cada cuánto debo bañar a mi gata?" } ] }

@@ -1,5 +1,5 @@
-
-import { supabase } from './supabaseClient';
+import { peticion } from './api';
+import { idUsuario } from './sesionService';
 
 export const TIPOS_ACTIVIDAD = [
   'Medicamento',
@@ -66,7 +66,7 @@ const convertirHora = (hora) => {
     horas = (horas % 12) + (periodo === 'p' ? 12 : 0);
   }
 
-  return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:00`;
+  return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
 };
 
 const mostrarHora = (hora) => {
@@ -86,8 +86,8 @@ const emojiPorTipo = (tipo) => ({
   'Cita veterinaria': '🩺',
 }[tipo] || '🐾');
 
+// Convierte una actividad del backend al formato que usan las pantallas
 const adaptarActividad = (actividad) => {
-  const fecha = mostrarFecha(actividad.fecha);
   const hoy = new Date();
   const fechaHoy = [
     hoy.getFullYear(),
@@ -97,17 +97,17 @@ const adaptarActividad = (actividad) => {
 
   return {
     id: actividad.id,
-    mascotaId: actividad.mascota_id,
-    mascota: actividad.mascotas?.nombre || '',
+    mascotaId: actividad.mascotaId,
+    mascota: actividad.mascotaNombre || '',
     nombre: actividad.nombre,
     tipo: actividad.tipo,
     hora: mostrarHora(actividad.hora),
-    fecha,
+    fecha: mostrarFecha(actividad.fecha),
     repeticion: actividad.repetir,
-    recordatorioOn: actividad.recordatorio_activo,
-    recordatorio: actividad.minutos_antes === 60
+    recordatorioOn: actividad.recordatorioActivo,
+    recordatorio: actividad.minutosAntes === 60
       ? '1 hora antes'
-      : `${actividad.minutos_antes || 15} minutos antes`,
+      : `${actividad.minutosAntes || 15} minutos antes`,
     notas: actividad.notas || '',
     completada: actividad.completada,
     dia: actividad.fecha === fechaHoy ? 'hoy' : 'semana',
@@ -116,49 +116,8 @@ const adaptarActividad = (actividad) => {
   };
 };
 
-const obtenerUsuario = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error) throw error;
-  if (!user) throw new Error('Debes iniciar sesión.');
-
-  return user;
-};
-
-export const obtenerActividadesHorario = async () => {
-  const user = await obtenerUsuario();
-
-  const { data, error } = await supabase
-    .from('actividades')
-    .select('*, mascotas(nombre)')
-    .eq('usuario_id', user.id)
-    .order('fecha', { ascending: true })
-    .order('hora', { ascending: true });
-
-  if (error) throw error;
-
-  return (data || []).map(adaptarActividad);
-};
-
-export const obtenerActividades = async () => {
-  const actividades = await obtenerActividadesHorario();
-
-  return actividades
-    .filter((actividad) => actividad.dia === 'hoy')
-    .map((actividad) => ({
-      id: actividad.id,
-      nombre: actividad.nombre,
-      tipo: actividad.tipo,
-      mascota: actividad.mascota,
-      hora: actividad.hora,
-      emoji: actividad.emoji,
-      completada: actividad.completada,
-    }));
-};
-
-export const guardarActividadSupabase = async (form) => {
-  const user = await obtenerUsuario();
-
+// Convierte el formulario de la pantalla al formato del backend
+const prepararActividad = (form) => {
   if (!form.mascotaId) {
     throw new Error('Selecciona una mascota.');
   }
@@ -167,80 +126,54 @@ export const guardarActividadSupabase = async (form) => {
     ? 60
     : Number.parseInt(form.recordatorio, 10) || 15;
 
-  const valores = {
-    usuario_id: user.id,
-    mascota_id: form.mascotaId,
+  return {
+    usuarioId: idUsuario(),
+    mascotaId: form.mascotaId,
     nombre: form.nombre.trim(),
     tipo: form.tipo.trim(),
     fecha: convertirFecha(form.fecha),
     hora: convertirHora(form.hora),
     repetir: form.repeticion || 'Una vez',
-    recordatorio_activo: form.recordatorioOn,
-    minutos_antes: minutos,
-    notas: form.notas?.trim() || null,
+    recordatorioActivo: form.recordatorioOn,
+    minutosAntes: minutos,
+    notas: form.notas?.trim() || '',
   };
-
-  const { data, error } = await supabase
-    .from('actividades')
-    .insert(valores)
-    .select('*, mascotas(nombre)')
-    .single();
-
-  if (error) throw error;
-
-  return adaptarActividad(data);
 };
 
-export const actualizarActividadSupabase = async (id, form) => {
-  const user = await obtenerUsuario();
-
-  const minutos = form.recordatorio === '1 hora antes'
-    ? 60
-    : Number.parseInt(form.recordatorio, 10) || 15;
-
-  const { data, error } = await supabase
-    .from('actividades')
-    .update({
-      mascota_id: form.mascotaId,
-      nombre: form.nombre.trim(),
-      tipo: form.tipo.trim(),
-      fecha: convertirFecha(form.fecha),
-      hora: convertirHora(form.hora),
-      repetir: form.repeticion || 'Una vez',
-      recordatorio_activo: form.recordatorioOn,
-      minutos_antes: minutos,
-      notas: form.notas?.trim() || null,
-    })
-    .eq('id', id)
-    .eq('usuario_id', user.id)
-    .select('*, mascotas(nombre)')
-    .single();
-
-  if (error) throw error;
-
-  return adaptarActividad(data);
+// GET /api/actividades?usuarioId=...
+export const obtenerActividadesHorario = async () => {
+  const datos = await peticion(`/actividades?usuarioId=${idUsuario()}`);
+  return datos.map(adaptarActividad);
 };
 
-export const cambiarCompletadaSupabase = async (id, completada) => {
-  const user = await obtenerUsuario();
-
-  const { error } = await supabase
-    .from('actividades')
-    .update({ completada })
-    .eq('id', id)
-    .eq('usuario_id', user.id);
-
-  if (error) throw error;
+// Actividades de hoy (pantalla de Inicio)
+export const obtenerActividades = async () => {
+  const actividades = await obtenerActividadesHorario();
+  return actividades.filter((actividad) => actividad.dia === 'hoy');
 };
 
-export const eliminarActividadSupabase = async (id) => {
-  const user = await obtenerUsuario();
+// POST /api/actividades
+export const crearActividadApi = async (form) => {
+  const datos = await peticion('/actividades', 'POST', prepararActividad(form));
+  return adaptarActividad(datos);
+};
 
-  const { error } = await supabase
-    .from('actividades')
-    .delete()
-    .eq('id', id)
-    .eq('usuario_id', user.id);
+// PUT /api/actividades/{id}
+export const actualizarActividadApi = async (id, form) => {
+  const datos = await peticion(`/actividades/${id}`, 'PUT', prepararActividad(form));
+  return adaptarActividad(datos);
+};
 
-  if (error) throw error;
+// PUT /api/actividades/{id}/completada?usuarioId=...
+export const cambiarCompletadaApi = async (id, completada) => {
+  await peticion(
+    `/actividades/${id}/completada?usuarioId=${idUsuario()}`,
+    'PUT',
+    { completada }
+  );
+};
+
+// DELETE /api/actividades/{id}?usuarioId=...
+export const eliminarActividadApi = async (id) => {
+  await peticion(`/actividades/${id}?usuarioId=${idUsuario()}`, 'DELETE');
 };

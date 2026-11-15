@@ -9,9 +9,10 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { obtenerPerfil } from '../services/perfilService';
-import { supabase } from '../services/supabaseClient';
+import { obtenerPerfil, actualizarPerfil } from '../services/usuarioService';
+import { cerrarSesion } from '../services/sesionService';
 import { obtenerMascotas } from '../services/mascotasService';
+import { obtenerActividadesHorario } from '../services/actividadesService';
 
 export default function PerfilScreen() {
   const [usuario, setUsuario] = useState({
@@ -27,6 +28,7 @@ export default function PerfilScreen() {
   });
   const [notificaciones, setNotificaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [preferenciasCargadas, setPreferenciasCargadas] = useState(false);
 
   const [recordatorios, setRecordatorios] = useState(true);
   const [tiempoRecordatorio, setTiempoRecordatorio] = useState('15');
@@ -48,101 +50,77 @@ export default function PerfilScreen() {
     fin: '7:00 a. m.',
   });
 
+  // Carga el perfil, las mascotas y las actividades desde el backend
   useEffect(() => {
     const cargar = async () => {
       try {
-        const data = await obtenerPerfil();
-        
-// Obtener el usuario que inició sesión.
-const {
-  data: { user },
-  error,
-} = await supabase.auth.getUser();
+        const [perfil, mascotas, actividades] = await Promise.all([
+          obtenerPerfil(),         // GET /api/usuarios/{id}
+          obtenerMascotas(),       // GET /api/mascotas
+          obtenerActividadesHorario(), // GET /api/actividades
+        ]);
 
-if (error) {
-  console.log('Error al obtener usuario:', error.message);
-}
+        setUsuario({
+          nombre: perfil.nombre,
+          email: perfil.email,
+          mascotas: mascotas.length,
+          emoji: '👤',
+        });
 
+        // Estadísticas calculadas con las actividades reales
+        const realizadas = actividades.filter((a) => a.completada).length;
+        const total = actividades.length;
+        setEstadisticas({
+          actividadesRealizadas: realizadas,
+          tasaCumplimiento: total > 0 ? Math.round((realizadas / total) * 100) : 0,
+          diasSeguimiento: new Set(actividades.map((a) => a.fecha)).size,
+        });
 
-if (user) {
-  // Obtener mascotas y actividades reales del usuario.
-  const mascotas = await obtenerMascotas();
+        // Últimas notificaciones: las próximas actividades pendientes
+        setNotificaciones(
+          actividades
+            .filter((a) => !a.completada)
+            .slice(0, 3)
+            .map((a) => ({
+              id: a.id,
+              icono: a.emoji,
+              titulo: `Es hora de ${a.nombre}`,
+              subtitulo: `${a.mascota} • ${a.fecha} ${a.hora}`,
+            }))
+        );
 
-  const { data: actividades, error: errorActividades } =
-    await supabase
-      .from('actividades')
-      .select('id, fecha, completada')
-      .eq('usuario_id', user.id);
-
-  if (errorActividades) throw errorActividades;
-
-  const listaActividades = actividades || [];
-  const realizadas = listaActividades.filter(
-    (actividad) => actividad.completada
-  ).length;
-
-  const total = listaActividades.length;
-
-  const tasaCumplimiento =
-    total > 0 ? Math.round((realizadas / total) * 100) : 0;
-
-  // Contar fechas diferentes con actividades registradas.
-  const diasSeguimiento = new Set(
-    listaActividades.map((actividad) => actividad.fecha)
-  ).size;
-
-  setUsuario({
-    nombre:
-      user.user_metadata?.nombre ||
-      user.email?.split('@')[0] ||
-      'Usuario',
-    email: user.email || '',
-    mascotas: mascotas.length,
-    emoji: '👤',
-  });
-
-  setEstadisticas({
-    actividadesRealizadas: realizadas,
-    tasaCumplimiento,
-    diasSeguimiento,
-  });
-} else {
-  setUsuario({
-    nombre: 'Usuario',
-    email: '',
-    mascotas: 0,
-    emoji: '👤',
-  });
-
-  setEstadisticas({
-    actividadesRealizadas: 0,
-    tasaCumplimiento: 0,
-    diasSeguimiento: 0,
-  });
-}
-
-
-// Estadísticas y notificaciones vacías por ahora,
-// hasta conectarlas con los datos reales del usuario.
-
-setNotificaciones([]);
-
-
-
-        setRecordatorios(data.preferencias.recordatorios);
-        setTiempoRecordatorio(data.preferencias.tiempoRecordatorio);
-        setNotificacionesPush(data.preferencias.notificacionesPush);
-        setModoSilencioso(data.preferencias.modoSilencioso);
-        setHoraInicioSilencio(data.preferencias.horaInicioSilencio);
-        setHoraFinSilencio(data.preferencias.horaFinSilencio);
+        // Preferencias guardadas en el backend
+        setRecordatorios(perfil.recordatorios);
+        setTiempoRecordatorio(perfil.tiempoRecordatorio);
+        setNotificacionesPush(perfil.notificacionesPush);
+        setModoSilencioso(perfil.modoSilencioso);
+        setHoraInicioSilencio(perfil.horaInicioSilencio);
+        setHoraFinSilencio(perfil.horaFinSilencio);
+        setPreferenciasCargadas(true);
       } catch (e) {
-        console.log('Error al cargar perfil:', e);
+        console.log('Error al cargar perfil:', e.message);
       } finally {
         setCargando(false);
       }
     };
     cargar();
   }, []);
+
+  // Cada vez que cambia una preferencia se guarda: PUT /api/usuarios/{id}
+  useEffect(() => {
+    if (!preferenciasCargadas) return;
+    actualizarPerfil({
+      nombre: usuario.nombre,
+      email: usuario.email,
+      recordatorios,
+      tiempoRecordatorio,
+      notificacionesPush,
+      modoSilencioso,
+      horaInicioSilencio,
+      horaFinSilencio,
+    }).catch((e) => console.log('Error al guardar preferencias:', e.message));
+  }, [recordatorios, tiempoRecordatorio, notificacionesPush, modoSilencioso,
+      horaInicioSilencio, horaFinSilencio]);
 
   const abrirEditar = () => {
     setFormPerfil({ nombre: usuario.nombre, email: usuario.email });
@@ -159,8 +137,22 @@ setNotificaciones([]);
     setErroresPerfil(errores);
     if (Object.keys(errores).length > 0) return;
 
-    setUsuario({ ...usuario, nombre: formPerfil.nombre, email: formPerfil.email });
-    setModalEditar(false);
+    // PUT /api/usuarios/{id}
+    actualizarPerfil({
+      nombre: formPerfil.nombre,
+      email: formPerfil.email,
+      recordatorios,
+      tiempoRecordatorio,
+      notificacionesPush,
+      modoSilencioso,
+      horaInicioSilencio,
+      horaFinSilencio,
+    })
+      .then((perfil) => {
+        setUsuario({ ...usuario, nombre: perfil.nombre, email: perfil.email });
+        setModalEditar(false);
+      })
+      .catch((e) => setErroresPerfil({ email: e.message })); // ej. correo ya en uso
   };
 
   const guardarSilencio = () => {
@@ -387,13 +379,7 @@ setNotificaciones([]);
 
 <Pressable
   style={styles.logoutButton}
-  onPress={async () => {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      console.log('Error al cerrar sesión:', error.message);
-    }
-  }}
+  onPress={cerrarSesion}
 >
   <Text style={styles.logoutText}>Cerrar sesión</Text>
 </Pressable>   

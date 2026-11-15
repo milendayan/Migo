@@ -13,10 +13,10 @@ import {
 import {
   obtenerActividadesHorario,
   TIPOS_ACTIVIDAD,
-  guardarActividadSupabase,
-  actualizarActividadSupabase,
-  cambiarCompletadaSupabase,
-  eliminarActividadSupabase,
+  crearActividadApi,
+  actualizarActividadApi,
+  cambiarCompletadaApi,
+  eliminarActividadApi,
 } from '../services/actividadesService';
 
 import { obtenerMascotas } from '../services/mascotasService';
@@ -112,7 +112,7 @@ const toggleCompletada = async (id) => {
 
     const nuevoEstado = !actividad.completada;
 
-    await cambiarCompletadaSupabase(id, nuevoEstado);
+    await cambiarCompletadaApi(id, nuevoEstado);
 
     setActividades((prev) =>
       prev.map((a) =>
@@ -206,7 +206,7 @@ const guardarActividad = async () => {
     setErrorOperacion('');
 
     if (modoEdicion && actividadEditando) {
-      const actualizada = await actualizarActividadSupabase(
+      const actualizada = await actualizarActividadApi(
         actividadEditando.id,
         form
       );
@@ -217,7 +217,7 @@ const guardarActividad = async () => {
         )
       );
     } else {
-      const nueva = await guardarActividadSupabase(form);
+      const nueva = await crearActividadApi(form);
 
       setActividades((prev) =>
         [...prev, nueva].sort((a, b) => {
@@ -255,7 +255,7 @@ const confirmarBorrado = async () => {
   try {
     setErrorOperacion('');
 
-    await eliminarActividadSupabase(confirmarEliminar);
+    await eliminarActividadApi(confirmarEliminar);
 
     setActividades((prev) =>
       prev.filter((a) => a.id !== confirmarEliminar)

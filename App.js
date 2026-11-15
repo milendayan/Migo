@@ -16,7 +16,7 @@ import LoginScreen from './screens/LoginScreen';
 import RegistroScreen from './screens/RegistroScreen';
 
 import BottomTabBar from './navigation/BottomTabBar';
-import { supabase } from './services/supabaseClient';
+import { cargarSesion, escucharSesion } from './services/sesionService';
 
 export default function App() {
   const [pantalla, setPantalla] = useState('inicio');
@@ -25,35 +25,21 @@ export default function App() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    // Revisar si ya existe una sesión iniciada.
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        console.warn('Error al recuperar sesión:', error.message);
-      }
-
-      setSession(data?.session ?? null);
-      setCargando(false);
-    }).catch((error) => {
-      console.warn('Error al recuperar sesión:', error);
-      setCargando(false);
-    });
+    // Revisar si ya existe una sesión guardada en el celular.
+    cargarSesion()
+      .then((usuario) => setSession(usuario))
+      .catch((error) => console.warn('Error al recuperar sesión:', error))
+      .finally(() => setCargando(false));
 
     // Detectar cuando alguien inicia o cierra sesión.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, nuevaSession) => {
-        setSession(nuevaSession);
-
-        if (!nuevaSession) {
-          setPantalla('inicio');
-        }
+    const dejarDeEscuchar = escucharSesion((usuario) => {
+      setSession(usuario);
+      if (!usuario) {
+        setPantalla('inicio');
       }
-    );
+    });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return dejarDeEscuchar;
   }, []);
 
   const renderPantalla = () => {
