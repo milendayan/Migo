@@ -42,6 +42,19 @@ export default function PerfilScreen() {
   const [modalSilencio, setModalSilencio] = useState(false);
   const [modalPrivacidad, setModalPrivacidad] = useState(false);
   const [modalAyuda, setModalAyuda] = useState(false);
+  const [ayudaTexto, setAyudaTexto] = useState('');
+  const [privacidadTexto, setPrivacidadTexto] = useState('');
+  const AYUDA = {
+    faq: 'MIGO guarda tus mascotas, su salud y su horario de cuidado. Puedes preguntarle a MIGO IA dudas de bienestar animal.',
+    soporte: 'Escríbenos a jasmindanielamv@gmail.com y te respondemos pronto.',
+    guia: 'Agrega tu mascota en "Mis mascotas", programa actividades en "Horario" y registra vacunas, citas y peso en su perfil de salud.',
+    problema: 'Cuéntanos qué falló escribiendo a jasmindanielamv@gmail.com con una captura de pantalla.',
+  };
+  const PRIVACIDAD = {
+    datos: 'Para solicitar una copia de tus datos escribe a jasmindanielamv@gmail.com.',
+    eliminar: 'Para eliminar tu cuenta y tus datos escribe a jasmindanielamv@gmail.com.',
+    politica: 'MIGO solo usa tus datos para el cuidado de tus mascotas. Tu contraseña se guarda cifrada y no se comparte con terceros.',
+  };
 
   const [formPerfil, setFormPerfil] = useState({ nombre: '', email: '' });
   const [erroresPerfil, setErroresPerfil] = useState({});
@@ -540,28 +553,30 @@ export default function PerfilScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>Privacidad</Text>
-              <Pressable onPress={() => setModalPrivacidad(false)}>
+              <Pressable onPress={() => { setPrivacidadTexto(''); setModalPrivacidad(false); }}>
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
             </View>
             <Text style={styles.modalDesc}>Gestiona tus datos personales.</Text>
 
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setPrivacidadTexto(PRIVACIDAD.datos)}>
               <Text style={styles.opcionListaTexto}>Descargar mis datos</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setPrivacidadTexto(PRIVACIDAD.eliminar)}>
               <Text style={styles.opcionListaTexto}>Eliminar cuenta</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setPrivacidadTexto(PRIVACIDAD.politica)}>
               <Text style={styles.opcionListaTexto}>Política de privacidad</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
 
+            {privacidadTexto ? <Text style={{ marginVertical: 10, color: '#444', lineHeight: 20 }}>{privacidadTexto}</Text> : null}
+
             <Pressable
               style={styles.botonCerrarSolo}
-              onPress={() => setModalPrivacidad(false)}
+              onPress={() => { setPrivacidadTexto(''); setModalPrivacidad(false); }}
             >
               <Text style={styles.botonGuardarTexto}>Cerrar</Text>
             </Pressable>
@@ -575,31 +590,33 @@ export default function PerfilScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>Ayuda y soporte</Text>
-              <Pressable onPress={() => setModalAyuda(false)}>
+              <Pressable onPress={() => { setAyudaTexto(''); setModalAyuda(false); }}>
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
             </View>
 
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setAyudaTexto(AYUDA.faq)}>
               <Text style={styles.opcionListaTexto}>❓ Preguntas frecuentes</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setAyudaTexto(AYUDA.soporte)}>
               <Text style={styles.opcionListaTexto}>📧 Contactar soporte</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setAyudaTexto(AYUDA.guia)}>
               <Text style={styles.opcionListaTexto}>📖 Guía de uso</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
-            <Pressable style={styles.opcionLista}>
+            <Pressable style={styles.opcionLista} onPress={() => setAyudaTexto(AYUDA.problema)}>
               <Text style={styles.opcionListaTexto}>🐛 Reportar un problema</Text>
               <Text style={styles.arrow}>›</Text>
             </Pressable>
 
+            {ayudaTexto ? <Text style={{ marginVertical: 10, color: '#444', lineHeight: 20 }}>{ayudaTexto}</Text> : null}
+
             <Pressable
               style={styles.botonCerrarSolo}
-              onPress={() => setModalAyuda(false)}
+              onPress={() => { setAyudaTexto(''); setModalAyuda(false); }}
             >
               <Text style={styles.botonGuardarTexto}>Cerrar</Text>
             </Pressable>
